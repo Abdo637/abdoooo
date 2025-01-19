@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Snake Game</title>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background: linear-gradient(to bottom, #6a11cb, #2575fc); /* خلفية ملونة */
+            flex-direction: column;
+        }
+        canvas {
+            border: 5px solid #fff; /* حواف للكانفاس */
+            background-color: #000;
+            margin-bottom: 20px;
+        }
+        .controls {
+            display: grid;
+            grid-template-columns: 50px 50px 50px;
+            grid-template-rows: 50px 50px 50px;
+            gap: 10px;
+        }
+        .controls button {
+            width: 50px;
+            height: 50px;
+            background-color: #333;
+            color: white;
+            border: 2px solid #fff; /* حواف للأزرار */
+            font-size: 20px;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-radius: 8px; /* زوايا دائرية للأزرار */
+        }
+        #upBtn { grid-column: 2; grid-row: 1; }
+        #leftBtn { grid-column: 1; grid-row: 2; }
+        #rightBtn { grid-column: 3; grid-row: 2; }
+        #downBtn { grid-column: 2; grid-row: 3; }
+        .speed-controls, .game-controls {
+            margin-top: 20px;
+        }
+        .speed-controls button, .game-controls button {
+            margin: 5px;
+            padding: 10px 20px;
+            background-color: #555;
+            color: white;
+            border: 2px solid #fff; /* حواف */
+            font-size: 16px;
+            cursor: pointer;
+            border-radius: 8px;
+        }
+        #pauseBtn { margin-bottom: 10px; }
+        #restartBtn { border-radius: 50%; }
+        .game-over {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            z-index: 10;
+            font-size: 24px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas" width="400" height="400"></canvas>
+    <div class="game-controls">
+        <button id="pauseBtn">توقف مؤقت</button>
+        <button id="restartBtn">↺</button>
+    </div>
+    <div class="controls">
+        <button id="upBtn">↑</button>
+        <button id="leftBtn">←</button>
+        <button id="rightBtn">→</button>
+        <button id="downBtn">↓</button>
+    </div>
+    <div class="speed-controls">
+        <button id="increaseSpeed">زيادة السرعة</button>
+        <button id="decreaseSpeed">تقليل السرعة</button>
+    </div>
+    <div class="game-over" id="gameOverScreen">
+        <p>Game Over</p>
+        <button id="restartGameBtn">إعادة البدء</button>
+    </div>
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        const scale = 20;
+        const rows = canvas.height / scale;
+        const columns = canvas.width / scale;
+
+        let snake;
+        let apple;
+        let speed = 100;
+        let interval;
+        let isPaused = false;
+
+        (function setup() {
+            snake = new Snake();
+            apple = new Apple();
+            interval = window.setInterval(gameLoop, speed);
+        })();
+
+        function gameLoop() {
+            if (!isPaused) {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                snake.update();
+                snake.draw();
+                apple.draw();
+
+                if (snake.eat(apple)) {
+                    apple.randomize();
+                }
+
+                if (snake.collide()) {
+                    clearInterval(interval);
+                    document.getElementById('gameOverScreen').style.display = 'flex';
+                }
+            }
+        }
+
+        function Snake() {
+            this.snakeArray = [{ x: 2, y: 2 }];
+            this.length = 1;
+            this.direction = 'RIGHT';
+
+            this.update = function () {
+                let head = { ...this.snakeArray[0] };
+
+                if (this.direction === 'UP') head.y--;
+                if (this.direction === 'DOWN') head.y++;
+                if (this.direction === 'LEFT') head.x--;
+                if (this.direction === 'RIGHT') head.x++;
+
+                if (head.x < 0) head.x = columns - 1;
+                if (head.x >= columns) head.x = 0;
+                if (head.y < 0) head.y = rows - 1;
+                if (head.y >= rows) head.y = 0;
+
+                this.snakeArray.unshift(head);
+                if (this.snakeArray.length > this.length) this.snakeArray.pop();
+            };
+
+            this.draw = function () {
+                this.snakeArray.forEach((segment, index) => {
+                    if (index === 0) {
+                        // رأس الثعبان دائري مع عيون
+                        ctx.fillStyle = 'green';
+                        ctx.beginPath();
+                        ctx.arc(
+                            segment.x * scale + scale / 2,
+                            segment.y * scale + scale / 2,
+                            scale / 2,
+                            0,
+                            Math.PI * 2
+                        );
+                        ctx.fill();
+                        // عيون
+                        ctx.fillStyle = 'white';
+                        ctx.beginPath();
+                        ctx.arc(segment.x * scale + scale / 3, segment.y * scale + scale / 3, 3, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.beginPath();
+                        ctx.arc(segment.x * scale + (2 * scale) / 3, segment.y * scale + scale / 3, 3, 0, Math.PI * 2);
+                        ctx.fill();
+                    } else {
+                        // باقي الجسم مستطيلات
+                        ctx.fillStyle = 'green';
+                        ctx.fillRect(segment.x * scale, segment.y * scale, scale, scale);
+                    }
+                });
+            };
+
+            this.changeDirection = function (dir) {
+                if (dir === 'LEFT' && this.direction !== 'RIGHT') this.direction = 'LEFT';
+                if (dir === 'UP' && this.direction !== 'DOWN') this.direction = 'UP';
+                if (dir === 'RIGHT' && this.direction !== 'LEFT') this.direction = 'RIGHT';
+                if (dir === 'DOWN' && this.direction !== 'UP') this.direction = 'DOWN';
+            };
+
+            this.eat = function (apple) {
+                if (this.snakeArray[0].x === apple.x && this.snakeArray[0].y === apple.y) {
+                    this.length++;
+                    return true;
+                }
+                return false;
+            };
+
+            this.collide = function () {
+                for (let i = 1; i < this.snakeArray.length; i++) {
+                    if (this.snakeArray[i].x === this.snakeArray[0].x && this.snakeArray[i].y === this.snakeArray[0].y) {
+                        return true;
+                    }
+                }
+                return false;
+            };
+        }
+
+        function Apple() {
+            this.randomize = function () {
+                this.x = Math.floor(Math.random() * columns);
+                this.y = Math.floor(Math.random() * rows);
+            };
+            this.draw = function () {
+                ctx.fillStyle = 'red';
+                ctx.beginPath();
+                ctx.arc(
+                    this.x * scale + scale / 2,
+                    this.y * scale + scale / 2,
+                    scale / 2,
+                    0,
+                    Math.PI * 2
+                );
+                ctx.fill();
+            };
+            this.randomize();
+        }
+
+        // أزرار التحكم
+        document.getElementById('leftBtn').addEventListener('click', function () {
+            snake.changeDirection('LEFT');
+        });
+        document.getElementById('upBtn').addEventListener('click', function () {
+            snake.changeDirection('UP');
+        });
+        document.getElementById('downBtn').addEventListener('click', function () {
+            snake.changeDirection('DOWN');
+        });
+        document.getElementById('rightBtn').addEventListener('click', function () {
+            snake.changeDirection('RIGHT');
+        });
+
+        // أزرار السرعة
+        document.getElementById('increaseSpeed').addEventListener('click', function () {
+            if (speed > 50) {
+                speed -= 10;
+                clearInterval(interval);
+                interval = setInterval(gameLoop, speed);
+            }
+        });
+        document.getElementById('decreaseSpeed').addEventListener('click', function () {
+            if (speed < 500) {
+                speed += 10;
+                clearInterval(interval);
+                interval = setInterval(gameLoop, speed);
+            }
+        });
+
+        // زر التوقف المؤقت
+        document.getElementById('pauseBtn').addEventListener('click', function () {
+            isPaused = !isPaused;
+            this.textContent = isPaused ? 'استئناف' : 'توقف مؤقت';
+        });
+
+        // زر إعادة البدء
+        document.getElementById('restartBtn').addEventListener('click', function () {
+            location.reload();
+        });
+
+        // شاشة Game Over
+        document.getElementById('restartGameBtn').addEventListener('click', function () {
+            location.reload();
+        });
+    </script>
+</body>
+</html>
